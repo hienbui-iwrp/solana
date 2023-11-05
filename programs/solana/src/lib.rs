@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, Transfer};
-declare_id!("8U2uMKTA35oa1tnQtrX7EfkbqXvNKjK8siAoX3wU9SVj");
+use anchor_spl::token::{Token, TokenAccount, Transfer};
+declare_id!("eKQ8XYLQV7n5NCrNpsivGx8Y6jFyNN5qPDj7KCk4SRw");
 
 #[program]
 pub mod solana {
@@ -10,9 +10,6 @@ pub mod solana {
 
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        Ok(())
-    }
     pub fn transfer_token(ctx: Context<TransferToken>, amount: u64) -> Result<()> {
         let transfer_cpi = Transfer {
             from: ctx.accounts.from.to_account_info(),
@@ -50,19 +47,44 @@ pub mod solana {
         token::transfer(transfer_ctx, amount)?;
         Ok(())
     }
-}
+    pub fn transfer_spl_tokens(ctx: Context<TransferSpl>, amount: u64) -> Result<()> {
+        let destination = &ctx.accounts.to_ata;
+        let source = &ctx.accounts.from_ata;
+        let token_program = &ctx.accounts.token_program;
+        let authority = &ctx.accounts.from;
 
-#[derive(Accounts)]
-pub struct Initialize {}
+        // Transfer tokens from taker to initializer
+        let cpi_accounts = Transfer {
+            from: source.to_account_info().clone(),
+            to: destination.to_account_info().clone(),
+            authority: authority.to_account_info().clone(),
+        };
+        let cpi_program = token_program.to_account_info();
+
+        token::transfer(CpiContext::new(cpi_program, cpi_accounts), amount)?;
+        Ok(())
+    }
+}
 
 #[derive(Accounts)]
 pub struct TransferToken<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(mut)]
-    pub from: UncheckedAccount<'info>,
+    pub from: Account<'info, TokenAccount>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(mut)]
-    pub to: AccountInfo<'info>,
+    pub to: Account<'info, TokenAccount>,
+    #[account(mut)]
     pub authority: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct TransferSpl<'info> {
+    pub from: Signer<'info>,
+    #[account(mut)]
+    pub from_ata: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub to_ata: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
