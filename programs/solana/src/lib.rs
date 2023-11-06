@@ -45,35 +45,38 @@ pub mod solana {
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
 
+        // assert!(balance >= price, "Exchange");
+
         msg!("seller: {:?}", seller);
         msg!("seller data: {:?}", seller.lamports());
         msg!("seller: {:?}", seller.owner);
+        msg!("from_ata: {:?}", from_ata.amount);
         // --- transfer sol ---
-        // // Create the transfer instruction
-        // let transfer_sol_instruction =
-        //     system_instruction::transfer(buyer.clone().key, seller.clone().key, price);
+        // Create the transfer instruction
+        let transfer_sol_instruction: anchor_lang::solana_program::instruction::Instruction =
+            system_instruction::transfer(buyer.clone().key, seller.clone().key, price);
 
-        // // Invoke the transfer instruction
-        // anchor_lang::solana_program::program::invoke_signed(
-        //     &transfer_sol_instruction,
-        //     &[
-        //         seller.to_account_info(),
-        //         buyer.to_account_info(),
-        //         system_program.to_account_info(),
-        //     ],
-        //     &[],
-        // )?;
+        // Invoke the transfer instruction
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_sol_instruction,
+            &[
+                buyer.to_account_info(),
+                seller.to_account_info().clone(),
+                system_program.to_account_info(),
+            ],
+            &[],
+        )?;
 
-        // // transfer token to buyer
-        // let transfer_cpi_account = Transfer {
-        //     from: from_ata.to_account_info().clone(),
-        //     to: to_ata.to_account_info().clone(),
-        //     authority: authority.to_account_info().clone(),
-        // };
-        // let transfer_program = token_program.to_account_info();
-        // let transfer_ctx = CpiContext::new(transfer_program, transfer_cpi_account);
+        // transfer token to buyer
+        let transfer_cpi_account = Transfer {
+            from: from_ata.to_account_info().clone(),
+            to: to_ata.to_account_info().clone(),
+            authority: authority.to_account_info().clone(),
+        };
+        let transfer_program = token_program.to_account_info();
+        let transfer_ctx = CpiContext::new(transfer_program, transfer_cpi_account);
 
-        // transfer(transfer_ctx, 1)?;
+        transfer(transfer_ctx, 1)?;
         Ok(())
     }
 }

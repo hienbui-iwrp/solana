@@ -172,15 +172,18 @@ describe("solana", async () => {
   // });
 
   it("exchange", async () => {
-    const signer = Keypair.fromSecretKey(
+    // master
+    const buyer = Keypair.fromSecretKey(
       bs58.decode(
         "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
       )
     );
-    // Generate keypairs for the new accounts
-    // const toKp = new web3.Keypair();
-    const toWallet: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-      "AnVaDqMUTP4xfCj1cq2yKHxt3KRxfZFWEtci5atDwioQ"
+
+    // slave
+    const seller = Keypair.fromSecretKey(
+      bs58.decode(
+        "53TekE7TmKdBMMN226DCJy4GmxbQa6M5oLwPXaPoL4shq82D15CcHaJbSQ2Jte7rzzY7e27TMo4Thc3vLZN1BAAS"
+      )
     );
 
     // Create a new mint and initialize it
@@ -194,8 +197,15 @@ describe("solana", async () => {
     // const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
     //   "5aHDQtsDbE8d33VrJ7wWwJATjx6RwZwnekTZy1auyeV3"
     // );
+    // const mintKey = await createMint(
+    //   program.provider.connection,
+    //   signer,
+    //   signer.publicKey,
+    //   null,
+    //   0
+    // );
     const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-      "4B7ushztcK4NAWdLyFoP5dxWKdHs9E3PCsjhQvz37XPv"
+      "BxnbREJ2UEyDb8jJ125YAUvkyHpeGm3czjjraA8rwSAJ"
     );
 
     console.log("mint: ", mintKey);
@@ -204,9 +214,9 @@ describe("solana", async () => {
     const fromAta = (
       await getOrCreateAssociatedTokenAccount(
         connection,
-        signer,
+        buyer,
         mintKey,
-        signer.publicKey
+        seller.publicKey
       )
     ).address;
     console.log("fromAta: ", fromAta);
@@ -214,26 +224,38 @@ describe("solana", async () => {
     const toAta = (
       await getOrCreateAssociatedTokenAccount(
         connection,
-        signer,
+        buyer,
         mintKey,
-        toWallet
+        buyer.publicKey
       )
     ).address;
     console.log("toAta: ", toAta);
 
+    // approve
+    const approveLog = await approve(
+      connection,
+      seller,
+      fromAta,
+      buyer.publicKey,
+      seller.publicKey,
+      1
+    );
+
+    console.log("approveLog: ", approveLog);
+
     // Send transaction
-    const transferAmount = new anchor.BN(1);
+    const transferAmount = new anchor.BN(10 ** 8);
     const txHash = await program.methods
       .exchange(transferAmount)
       .accounts({
-        authority: signer.publicKey,
+        authority: buyer.publicKey,
         fromAta: fromAta,
-        seller: signer.publicKey,
-        buyer: toWallet,
+        seller: seller.publicKey,
+        buyer: buyer.publicKey,
         toAta: toAta,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([signer])
+      .signers([buyer])
       .rpc();
     console.log(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
     console.log(await connection.confirmTransaction(txHash, "finalized"));
