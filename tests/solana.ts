@@ -36,19 +36,20 @@ describe("solana", async () => {
   //   "HAHr5pggn8qorwG8TiXW6qfGmMTA2og6q4wtHBXQBKtF"
   // );
   // Generate a random keypair that will represent our token
-  const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-    "Cq8hxPZGiHNzsPG86jbL6JyC6mAm5ETHp7pLh8My7a9Y"
-  );
 
   // const mintKeypair: anchor.web3.Keypair = Keypair.generate();
   // const mintKey: anchor.web3.PublicKey = mintKeypair.publicKey;
-  console.log("mintKey: ", mintKey);
 
   // AssociatedTokenAccount for anchor's workspace wallet
   const program = anchor.workspace.Solana as Program<Solana>;
 
   // const connection = new Connection("http://127.0.0.1:8899", "confirmed");
   const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+  const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+    "9qgk7Mx2ydPZiTfhrKyy7py8x7k6cd9WMycV1oSnA6s2"
+  );
+  console.log("mintKey: ", mintKey);
   // it("test", async () => {
   //   const fromWallet: anchor.web3.PublicKey = new anchor.web3.PublicKey(
   //     "2LvdTByDDo4t2gv43PauUWZwMSUGYvPtLFPtpSeGDepu"
@@ -141,54 +142,60 @@ describe("solana", async () => {
       "AnVaDqMUTP4xfCj1cq2yKHxt3KRxfZFWEtci5atDwioQ"
     );
     // Create a new mint and initialize it
-    const mintKp = new web3.Keypair();
-    const mint = await createMint(
-      connection,
-      signer,
-      signer.publicKey,
-      null,
-      0
+    // const mint = await createMint(
+    //   connection,
+    //   signer,
+    //   signer.publicKey,
+    //   null,
+    //   0
+    // );
+    const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+      "5aHDQtsDbE8d33VrJ7wWwJATjx6RwZwnekTZy1auyeV3"
     );
 
-    console.log("mint: ", mint);
+    console.log("mint: ", mintKey);
 
     // Create associated token accounts for the new accounts
-    const fromAta = await createAssociatedTokenAccount(
-      connection,
-      signer,
-      mint,
-      signer.publicKey
-    );
+    const fromAta = (
+      await getOrCreateAssociatedTokenAccount(
+        connection,
+        signer,
+        mintKey,
+        signer.publicKey
+      )
+    ).address;
     console.log("fromAta: ", fromAta);
 
-    const toAta = await createAssociatedTokenAccount(
-      connection,
-      signer,
-      mint,
-      toWallet
-    );
+    const toAta = (
+      await getOrCreateAssociatedTokenAccount(
+        connection,
+        signer,
+        mintKey,
+        toWallet
+      )
+    ).address;
     console.log("toAta: ", toAta);
 
-    // Mint tokens to the 'from' associated token account
-    const mintAmount = 1000;
-    const logMint = await mintTo(
-      connection,
-      signer,
-      mint,
-      fromAta,
-      signer,
-      mintAmount
-    );
-    console.log("logMint: ", logMint);
+    // // Mint tokens to the 'from' associated token account
+    // const mintAmount = 1000;
+    // const logMint = await mintTo(
+    //   connection,
+    //   signer,
+    //   mintKey,
+    //   fromAta,
+    //   signer,
+    //   mintAmount
+    // );
+    // console.log("logMint: ", logMint);
 
     // Send transaction
-    const transferAmount = new anchor.BN(500);
+    const transferAmount = new anchor.BN(10);
     const txHash = await program.methods
-      .transferSplTokens(transferAmount)
+      .transferToken(transferAmount)
       .accounts({
-        from: signer.publicKey,
-        fromAta: fromAta,
-        toAta: toAta,
+        authority: signer.publicKey,
+        from: fromAta,
+        to: toAta,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([signer])
