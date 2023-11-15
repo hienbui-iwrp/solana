@@ -1,6 +1,7 @@
 
 .anchor
 .wallet
+.wallets
 .DS_Store
 target
 **/*.rs.bk

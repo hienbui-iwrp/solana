@@ -2,28 +2,17 @@ import * as anchor from "@project-serum/anchor";
 import { Program, web3 } from "@project-serum/anchor";
 import { Solana } from "../target/types/solana";
 import {
-  ACCOUNT_SIZE,
-  MINT_SIZE,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   approve,
-  createAssociatedTokenAccount,
-  createAssociatedTokenAccountInstruction,
-  createInitializeAccountInstruction,
-  createInitializeMintInstruction,
-  createMint,
-  createTransferInstruction,
   getAssociatedTokenAddress,
-  getMinimumBalanceForRentExemptAccount,
   getOrCreateAssociatedTokenAccount,
-  mintTo,
 } from "@solana/spl-token";
 import {
-  Account,
   Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
-  SystemProgram,
-  Transaction,
   clusterApiUrl,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -31,190 +20,47 @@ import bs58 from "bs58";
 describe("solana", async () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
+  const master = Keypair.fromSecretKey(
+    bs58.decode(
+      "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
+    )
+  );
+  // slave
+  const slave = Keypair.fromSecretKey(
+    bs58.decode(
+      "53TekE7TmKdBMMN226DCJy4GmxbQa6M5oLwPXaPoL4shq82D15CcHaJbSQ2Jte7rzzY7e27TMo4Thc3vLZN1BAAS"
+    )
+  );
 
-  // const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //   "HAHr5pggn8qorwG8TiXW6qfGmMTA2og6q4wtHBXQBKtF"
-  // );
-  // Generate a random keypair that will represent our token
-
-  // const mintKeypair: anchor.web3.Keypair = Keypair.generate();
-  // const mintKey: anchor.web3.PublicKey = mintKeypair.publicKey;
-
+  // slave2
+  const slave2 = Keypair.fromSecretKey(
+    bs58.decode(
+      "5LSYGKciCViPcWvyDN8WQoYGLzWae2ahSiaVRJgx48gUWXfBefFvsj4Yvqb4UWabBdcMpajtKRSz9AK6F9sNXawo"
+    )
+  );
   // AssociatedTokenAccount for anchor's workspace wallet
   const program = anchor.workspace.Solana as Program<Solana>;
 
-  // const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
-  const connection = new Connection("http://127.0.0.1:8899", "confirmed");
+  it("Exchange", async () => {
+    // const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-  const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-    "9qgk7Mx2ydPZiTfhrKyy7py8x7k6cd9WMycV1oSnA6s2"
-  );
-  console.log("mintKey: ", mintKey);
-
-  // it("transfer token", async () => {
-  //   const signer = Keypair.fromSecretKey(
-  //     bs58.decode(
-  //       "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
-  //     )
-  //   );
-  //   // Generate keypairs for the new accounts
-  //   // const toKp = new web3.Keypair();
-  //   const toWallet: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //     "AnVaDqMUTP4xfCj1cq2yKHxt3KRxfZFWEtci5atDwioQ"
-  //   );
-
-  //   // Create a new mint and initialize it
-  //   // const mint = await createMint(
-  //   //   connection,
-  //   //   signer,
-  //   //   signer.publicKey,
-  //   //   null,
-  //   //   0
-  //   // );
-  //   // const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //   //   "5aHDQtsDbE8d33VrJ7wWwJATjx6RwZwnekTZy1auyeV3"
-  //   // );
-  //   const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //     "4B7ushztcK4NAWdLyFoP5dxWKdHs9E3PCsjhQvz37XPv"
-  //   );
-
-  //   console.log("mint: ", mintKey);
-
-  //   // Create associated token accounts for the new accounts
-  //   const fromAta = (
-  //     await getOrCreateAssociatedTokenAccount(
-  //       connection,
-  //       signer,
-  //       mintKey,
-  //       signer.publicKey
-  //     )
-  //   ).address;
-  //   console.log("fromAta: ", fromAta);
-
-  //   const toAta = (
-  //     await getOrCreateAssociatedTokenAccount(
-  //       connection,
-  //       signer,
-  //       mintKey,
-  //       toWallet
-  //     )
-  //   ).address;
-  //   console.log("toAta: ", toAta);
-
-  //   // Send transaction
-  //   const transferAmount = new anchor.BN(10);
-  //   const txHash = await program.methods
-  //     .transferToken(transferAmount)
-  //     .accounts({
-  //       authority: signer.publicKey,
-  //       from: fromAta,
-  //       to: toAta,
-  //       tokenProgram: TOKEN_PROGRAM_ID,
-  //     })
-  //     .signers([signer])
-  //     .rpc();
-  //   console.log(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
-  //   console.log(await connection.confirmTransaction(txHash, "finalized"));
-  // });
-
-  // it("token account", async () => {
-  //   const signer = Keypair.fromSecretKey(
-  //     bs58.decode(
-  //       "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
-  //     )
-  //   );
-  //   // Generate keypairs for the new accounts
-  //   // const toKp = new web3.Keypair();
-  //   const toWallet: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //     "AnVaDqMUTP4xfCj1cq2yKHxt3KRxfZFWEtci5atDwioQ"
-  //   );
-  //   // Create a new mint and initialize it
-  //   // const mint = await createMint(
-  //   //   connection,
-  //   //   signer,
-  //   //   signer.publicKey,
-  //   //   null,
-  //   //   0
-  //   // );
-  //   const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //     "3TrPDVHBjcngbvytfBRxYsGU5RAdVJwaovoxKq9qi2JY"
-  //   );
-
-  //   console.log("mint: ", mintKey);
-
-  //   // Create associated token accounts for the new accounts
-
-  //   // Send transaction
-  //   const txHash = await program.methods
-  //     .getTokenAccount()
-  //     .accounts({
-  //       mint: mintKey,
-  //       owner: signer.publicKey,
-  //     })
-  //     .signers([signer])
-  //     .rpc();
-  //   console.log(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
-  //   const getReturnLog = (confirmedTransaction: any) => {
-  //     const prefix = "Program return: ";
-  //     let log = confirmedTransaction.meta.logMessages.find((log) =>
-  //       log.startsWith(prefix)
-  //     );
-  //     log = log.slice(prefix.length);
-  //     const [key, data] = log.split(" ", 2);
-  //     const buffer = Buffer.from(data, "base64");
-  //     return [key, data, buffer];
-  //   };
-  //   const returnValue = await connection.confirmTransaction(
-  //     txHash,
-  //     "finalized"
-  //   );
-  //   console.log("returnValue: ", returnValue);
-  // });
-
-  it("exchange", async () => {
     // master
-    const buyer = Keypair.fromSecretKey(
-      bs58.decode(
-        "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
-      )
-    );
-
+    const buyer = master;
     // slave
-    const seller = Keypair.fromSecretKey(
-      bs58.decode(
-        "53TekE7TmKdBMMN226DCJy4GmxbQa6M5oLwPXaPoL4shq82D15CcHaJbSQ2Jte7rzzY7e27TMo4Thc3vLZN1BAAS"
-      )
-    );
+    const seller = slave;
+    const authority = slave2;
 
-    // Create a new mint and initialize it
-    // const mint = await createMint(
-    //   connection,
-    //   signer,
-    //   signer.publicKey,
-    //   null,
-    //   0
-    // );
-    // const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-    //   "5aHDQtsDbE8d33VrJ7wWwJATjx6RwZwnekTZy1auyeV3"
-    // );
-    // const mintKey = await createMint(
-    //   program.provider.connection,
-    //   signer,
-    //   signer.publicKey,
-    //   null,
-    //   0
-    // );
     const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-      "BxnbREJ2UEyDb8jJ125YAUvkyHpeGm3czjjraA8rwSAJ"
+      "2zFJceHaC8SQonMLsMHia2s82w9VA2GNmEbYDkkxgNVH"
     );
-
-    console.log("mint: ", mintKey);
+    console.log("mintKey: ", mintKey);
 
     // Create associated token accounts for the new accounts
     const fromAta = (
       await getOrCreateAssociatedTokenAccount(
         connection,
-        buyer,
+        seller,
         mintKey,
         seller.publicKey
       )
@@ -236,28 +82,127 @@ describe("solana", async () => {
       connection,
       seller,
       fromAta,
-      buyer.publicKey,
+      authority.publicKey,
       seller.publicKey,
       1
     );
+    console.log("approve log: ", approveLog);
 
-    console.log("approveLog: ", approveLog);
-
-    // Send transaction
-    const transferAmount = new anchor.BN(10 ** 8);
     const txHash = await program.methods
-      .exchange(transferAmount)
+      .exchange(new anchor.BN(0.1 * LAMPORTS_PER_SOL))
       .accounts({
-        authority: buyer.publicKey,
+        mint: mintKey,
         fromAta: fromAta,
         seller: seller.publicKey,
-        buyer: buyer.publicKey,
         toAta: toAta,
+        buyer: buyer.publicKey,
+        authority: authority.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       })
-      .signers([buyer])
+      .signers([authority])
       .rpc();
-    console.log(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
-    console.log(await connection.confirmTransaction(txHash, "finalized"));
+
+    console.log(txHash);
   });
+
+  // it("exchange renec", async () => {
+  //   const connection = new Connection(
+  //     "https://api-testnet.renec.foundation:8899",
+  //     "confirmed"
+  //   );
+
+  //   // master
+  //   const buyer = Keypair.fromSecretKey(
+  //     bs58.decode(
+  //       "2jRmRZjxVNcmu4Tkgc322VrMxE1C2VRbkDpGvbmsR2zGFTaSTmyprcpAFLwaG8tN9Dru3eLNyoXdJcCXUVUrrm7T"
+  //     )
+  //   );
+
+  //   // slave
+  //   const seller = Keypair.fromSecretKey(
+  //     bs58.decode(
+  //       "53TekE7TmKdBMMN226DCJy4GmxbQa6M5oLwPXaPoL4shq82D15CcHaJbSQ2Jte7rzzY7e27TMo4Thc3vLZN1BAAS"
+  //     )
+  //   );
+
+  //   const mintKey: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+  //     "AK8tw64fY7bJR56WzhD5YcyabTfgwBcS1XRvmjfdZ13q"
+  //   );
+
+  //   console.log("mint: ", mintKey);
+
+  //   const fromATA = await findAssociatedTokenAddress(seller.publicKey, mintKey);
+  //   console.log("fromATA: ", fromATA);
+
+  //   // Create associated token accounts for the new accounts
+  //   // const fromAta = (
+  //   //   await getOrCreateAssociatedTokenAccount(
+  //   //     connection,
+  //   //     buyer,
+  //   //     mintKey,
+  //   //     seller.publicKey
+  //   //   )
+  //   // ).address;
+  //   // console.log("fromAta: ", fromAta);
+
+  //   // const toAta = (
+  //   //   await getOrCreateAssociatedTokenAccount(
+  //   //     connection,
+  //   //     buyer,
+  //   //     mintKey,
+  //   //     buyer.publicKey
+  //   //   )
+  //   // ).address;
+  //   // console.log("toAta: ", toAta);
+
+  //   // // approve
+  //   // const approveLog = await approve(
+  //   //   connection,
+  //   //   seller,
+  //   //   fromAta,
+  //   //   buyer.publicKey,
+  //   //   seller.publicKey,
+  //   //   1
+  //   // );
+
+  //   // console.log("approveLog: ", approveLog);
+
+  //   // // Send transaction
+  //   // const transferAmount = new anchor.BN(10 ** 8);
+  //   // const txHash = await program.methods
+  //   //   .exchange(transferAmount)
+  //   //   .accounts({
+  //   //     authority: buyer.publicKey,
+  //   //     fromAta: fromAta,
+  //   //     seller: seller.publicKey,
+  //   //     buyer: buyer.publicKey,
+  //   //     toAta: toAta,
+  //   //     tokenProgram: TOKEN_PROGRAM_ID,
+  //   //   })
+  //   //   .signers([buyer])
+  //   //   .rpc();
+  //   // console.log(`https://explorer.solana.com/tx/${txHash}?cluster=devnet`);
+  //   // console.log(await connection.confirmTransaction(txHash, "finalized"));
+  // });
 });
+
+const RPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID: PublicKey = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
+
+async function findAssociatedTokenAddress(
+  walletAddress: PublicKey,
+  tokenMintAddress: PublicKey
+): Promise<PublicKey> {
+  return (
+    await PublicKey.findProgramAddress(
+      [
+        walletAddress.toBuffer(),
+        TOKEN_PROGRAM_ID.toBuffer(),
+        tokenMintAddress.toBuffer(),
+      ],
+      RPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID
+    )
+  )[0];
+}
