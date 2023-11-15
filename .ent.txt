@@ -1,0 +1,6 @@
+PRIVATE_KEY_DEPLOYER=<private key 1>
+
+
+PRIVATE_KEY_RENEC_1=<private key 2>
+PRIVATE_KEY_RENEC_2=<private key 3>
+PRIVATE_KEY_RENEC_3=<private key 4>

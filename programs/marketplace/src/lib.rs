@@ -1,13 +1,31 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::associated_token::*;
-use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
-declare_id!("Eyo3z7YZP5iznmezGKLigNfBEeBgsMV6PMS6MCp7Gf3i");
+use anchor_spl::token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer};
+declare_id!("7ZGGMgd86tKJosUZfT3ohHeAGkH7cGaWGf9DYSaYcDJv");
 
 #[program]
-pub mod solana {
+pub mod marketplace {
 
     use super::*;
+    pub fn mint_nft(ctx: Context<MintNft>) -> Result<()> {
+        let mint = &ctx.accounts.mint;
+        let token_account = &ctx.accounts.token_account;
+        let authority = &ctx.accounts.authority;
+        // let system_program = &ctx.accounts.system_program;
+        let token_program = &ctx.accounts.token_program;
+        // let associated_token_program = &ctx.accounts.associated_token_program;
+
+        let mint_to_cpi_account = MintTo {
+            mint: mint.to_account_info().clone(),
+            to: token_account.to_account_info().clone(),
+            authority: authority.to_account_info().clone(),
+        };
+
+        let mint_to_ctx = CpiContext::new(token_program.to_account_info(), mint_to_cpi_account);
+        mint_to(mint_to_ctx, 1)?;
+        Ok(())
+    }
 
     pub fn exchange(ctx: Context<Exchange>, price: u64) -> Result<()> {
         let from_ata = &ctx.accounts.from_ata;
@@ -33,7 +51,7 @@ pub mod solana {
         anchor_lang::solana_program::program::invoke_signed(
             &transfer_sol_instruction,
             &[
-                buyer.to_account_info(),
+                buyer.to_account_info().clone(),
                 seller.to_account_info().clone(),
                 system_program.to_account_info(),
             ],
@@ -49,9 +67,36 @@ pub mod solana {
         let transfer_program = token_program.to_account_info();
         let transfer_ctx = CpiContext::new(transfer_program, transfer_cpi_account);
 
-        transfer(transfer_ctx, 1)
-        // Ok(())
+        transfer(transfer_ctx, 1)?;
+
+        Ok(())
     }
+}
+
+#[derive(Accounts)]
+pub struct MintNft<'info> {
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(
+        init_if_needed,
+        payer = authority,
+        mint::decimals = 0,
+        mint::authority = authority
+    )]
+    pub mint: Account<'info, Mint>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(
+        init_if_needed,
+        payer = authority,
+        associated_token::mint = mint,
+        associated_token::authority = authority,
+    )]
+    pub token_account: Account<'info, TokenAccount>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(Accounts)]
@@ -70,10 +115,9 @@ pub struct Exchange<'info> {
     pub to_ata: Account<'info, TokenAccount>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(mut)]
-    pub buyer: AccountInfo<'info>,
+    pub buyer: Signer<'info>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 }

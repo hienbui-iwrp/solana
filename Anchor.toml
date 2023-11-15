@@ -2,13 +2,13 @@
 seeds = false
 skip-lint = false
 [programs.devnet]
-solana = "Eyo3z7YZP5iznmezGKLigNfBEeBgsMV6PMS6MCp7Gf3i"
+marketplace = "7ZGGMgd86tKJosUZfT3ohHeAGkH7cGaWGf9DYSaYcDJv"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "https://api-testnet.renec.foundation:8899"
 wallet = ".wallet/master.json"
 
 [scripts]
