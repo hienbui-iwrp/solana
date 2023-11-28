@@ -1,14 +1,15 @@
 [features]
 seeds = false
 skip-lint = false
+
 [programs.devnet]
-marketplace = "7ZGGMgd86tKJosUZfT3ohHeAGkH7cGaWGf9DYSaYcDJv"
+solana_nft = "GZe7acAQjBMqTpikfQGaxeYHmddoaK3Qdpqf2fU1XK6g"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://api-testnet.renec.foundation:8899"
+cluster = "devnet"
 wallet = ".wallet/master.json"
 
 [scripts]

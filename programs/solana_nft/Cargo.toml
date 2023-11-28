@@ -1,12 +1,12 @@
 [package]
-name = "solana"
+name= "solana_nft"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "solana"
+name = "solana_nft"
 
 [features]
 no-entrypoint = []
@@ -16,6 +16,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = {version = "^0.28.0", features = ["init-if-needed"]}
-anchor-spl = "^0.28.0"
-spl-associated-token-account = { version ="2.2.0", features = ["no-entrypoint"] }
+anchor-lang = {version = "^0.29.0", features = ["init-if-needed"]}
+anchor-spl = { version = "^0.29.0", features = ["metadata"] }
+mpl-token-metadata = "3.2.2"
+

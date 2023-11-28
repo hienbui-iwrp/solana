@@ -1,23 +1,25 @@
 import * as anchor from "@project-serum/anchor";
 import { Program, web3 } from "@project-serum/anchor";
-import { Marketplace } from "../target/types/marketplace";
+import { SolanaNft } from "../target/types/solana_nft";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
-  approve,
   getAssociatedTokenAddress,
-  getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
-import {
-  Connection,
-  Keypair,
-  LAMPORTS_PER_SOL,
-  PublicKey,
-} from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet";
 import bs58 from "bs58";
-import idl from "../target/idl/marketplace.json";
+import idl from "../target/idl/solana_nft.json";
 import config from "./config.json";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
+import {
+  MPL_TOKEN_METADATA_PROGRAM_ID,
+  findMasterEditionPda,
+  findMetadataPda,
+  mplTokenMetadata,
+} from "@metaplex-foundation/mpl-token-metadata";
+import { publicKey } from "@metaplex-foundation/umi";
 require("dotenv").config();
 
 const programID = new PublicKey(config.programId);
@@ -27,30 +29,25 @@ describe("Solana", async () => {
   const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
 
   //   SET PROGRAM
-  const connection = new Connection(
-    "https://api-testnet.renec.foundation:8899",
-    "confirmed"
-  );
-  const wallet = new NodeWallet(
+  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  const deployer = new NodeWallet(
     Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY_DEPLOYER))
   );
-  const provider = new anchor.AnchorProvider(connection, wallet, {
+  const provider = new anchor.AnchorProvider(connection, deployer, {
     preflightCommitment: "recent",
     commitment: "processed",
   });
-  const program = new anchor.Program(idl as Marketplace, programID, provider);
+  const program = new anchor.Program(idl as SolanaNft, programID, provider);
   let mintKey = null;
 
   // select role
   const minter = Keypair.fromSecretKey(
-    bs58.decode(process.env.PRIVATE_KEY_RENEC_1)
+    bs58.decode(process.env.PRIVATE_KEY_SOLANA_1)
   );
-  const buyer = Keypair.fromSecretKey(
-    bs58.decode(process.env.PRIVATE_KEY_RENEC_2)
-  );
-  const authority = Keypair.fromSecretKey(
-    bs58.decode(process.env.PRIVATE_KEY_RENEC_3)
-  );
+
+  const umi = createUmi(clusterApiUrl("devnet"))
+    // .use(walletAdapterIdentity(provider.wallet))
+    .use(mplTokenMetadata());
 
   it("Mint NFT", async () => {
     const newMint = Keypair.generate();
@@ -61,67 +58,266 @@ describe("Solana", async () => {
       minter.publicKey
     );
     console.log("tokenAccount: ", tokenAccount.toString());
+
+    const name = "Some NFT";
+    const symbol = "SOME";
+    const uri =
+      "https://bafkreicctlwmsohditft23zxofu43ssjuxoztrlava3t6dedi7f2i6p22i.ipfs.nftstorage.link/";
+    // const uri = "";
+
+    // derive the metadata account
+    let metadataAccount = findMetadataPda(umi, {
+      mint: publicKey(newMint.publicKey),
+    })[0];
+
+    //derive the master edition pda
+    let masterEditionAccount = findMasterEditionPda(umi, {
+      mint: publicKey(newMint.publicKey),
+    })[0];
+    const param = {
+      name: "Some NFT",
+      symbol: "SOME",
+      uri: "https://bafkreicctlwmsohditft23zxofu43ssjuxoztrlava3t6dedi7f2i6p22i.ipfs.nftstorage.link/",
+      decimals: 2,
+    };
+
     const tx = await program.methods
-      .mintNft()
+      .initNft(param)
       .accounts({
+        signer: minter.publicKey,
         mint: newMint.publicKey,
-        tokenAccount: tokenAccount,
-        authority: minter.publicKey,
+        associatedTokenAccount: tokenAccount,
+        metadataAccount: metadataAccount,
+        masterEditionAccount: masterEditionAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SYSTEM_PROGRAM_ID,
+        tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
       .signers([newMint, minter])
       .rpc();
-    console.log(
-      `https://explorer.renec.foundation/transaction/${tx}?cluster=testnet`
-    );
-  });
-  it("Exchange", async () => {
-    console.log("mintKey: ", mintKey);
-    // Create associated token accounts for the new accounts
-    const fromAta = (
-      await getOrCreateAssociatedTokenAccount(
-        connection,
-        minter,
-        mintKey,
-        minter.publicKey
-      )
-    ).address;
-    console.log("fromAta: ", fromAta);
-    const toAta = (
-      await getOrCreateAssociatedTokenAccount(
-        connection,
-        buyer,
-        mintKey,
-        buyer.publicKey
-      )
-    ).address;
-    console.log("toAta: ", toAta);
-    // approve
-    const approveLog = await approve(
-      connection,
-      minter,
-      fromAta,
-      authority.publicKey,
-      minter.publicKey,
-      1
-    );
-    console.log("approve log: ", approveLog);
-    const txHash = await program.methods
-      .exchange(new anchor.BN(1 * LAMPORTS_PER_SOL))
-      .accounts({
-        mint: mintKey,
-        fromAta: fromAta,
-        seller: minter.publicKey,
-        toAta: toAta,
-        buyer: buyer.publicKey,
-        authority: authority.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SYSTEM_PROGRAM_ID,
-      })
-      .signers([authority, buyer])
-      .rpc();
-    console.log(txHash);
+    console.log(`https://explorer.solana.com/transaction/${tx}?cluster=devnet`);
+
+    const m = await getMetadataAccount(newMint.publicKey.toString());
+    console.log("metadata acc: ", m);
+
+    // get the account info for that account
+    const accInfo = await connection.getAccountInfo(new PublicKey(m));
+    console.log("accInfo: ", accInfo);
+
+    // finally, decode metadata
+    console.log("decode: ", decodeMetadata(accInfo!.data));
   });
 });
+
+import { BinaryReader, BinaryWriter, deserializeUnchecked } from "borsh";
+import base58 from "bs58";
+
+export const METADATA_PROGRAM_ID =
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" as StringPublicKey;
+export const METADATA_PREFIX = "metadata";
+
+const PubKeysInternedMap = new Map<string, PublicKey>();
+
+// Borsh extension for pubkey stuff
+(BinaryReader.prototype as any).readPubkey = function () {
+  const reader = this as unknown as BinaryReader;
+  const array = reader.readFixedArray(32);
+  return new PublicKey(array);
+};
+
+(BinaryWriter.prototype as any).writePubkey = function (value: PublicKey) {
+  const writer = this as unknown as BinaryWriter;
+  writer.writeFixedArray(value.toBuffer());
+};
+
+(BinaryReader.prototype as any).readPubkeyAsString = function () {
+  const reader = this as unknown as BinaryReader;
+  const array = reader.readFixedArray(32);
+  return base58.encode(array) as StringPublicKey;
+};
+
+(BinaryWriter.prototype as any).writePubkeyAsString = function (
+  value: StringPublicKey
+) {
+  const writer = this as unknown as BinaryWriter;
+  writer.writeFixedArray(base58.decode(value));
+};
+
+const toPublicKey = (key: string | PublicKey) => {
+  if (typeof key !== "string") {
+    return key;
+  }
+
+  let result = PubKeysInternedMap.get(key);
+  if (!result) {
+    result = new PublicKey(key);
+    PubKeysInternedMap.set(key, result);
+  }
+
+  return result;
+};
+
+const findProgramAddress = async (
+  seeds: (Buffer | Uint8Array)[],
+  programId: PublicKey
+) => {
+  const key =
+    "pda-" +
+    seeds.reduce((agg, item) => agg + item.toString("hex"), "") +
+    programId.toString();
+
+  const result = await PublicKey.findProgramAddress(seeds, programId);
+
+  return [result[0].toBase58(), result[1]] as [string, number];
+};
+
+export type StringPublicKey = string;
+
+export enum MetadataKey {
+  Uninitialized = 0,
+  MetadataV1 = 4,
+  EditionV1 = 1,
+  MasterEditionV1 = 2,
+  MasterEditionV2 = 6,
+  EditionMarker = 7,
+}
+
+class Creator {
+  address: StringPublicKey;
+  verified: boolean;
+  share: number;
+
+  constructor(args: {
+    address: StringPublicKey;
+    verified: boolean;
+    share: number;
+  }) {
+    this.address = args.address;
+    this.verified = args.verified;
+    this.share = args.share;
+  }
+}
+
+class Data {
+  name: string;
+  symbol: string;
+  uri: string;
+  sellerFeeBasisPoints: number;
+  creators: Creator[] | null;
+  constructor(args: {
+    name: string;
+    symbol: string;
+    uri: string;
+    sellerFeeBasisPoints: number;
+    creators: Creator[] | null;
+  }) {
+    this.name = args.name;
+    this.symbol = args.symbol;
+    this.uri = args.uri;
+    this.sellerFeeBasisPoints = args.sellerFeeBasisPoints;
+    this.creators = args.creators;
+  }
+}
+
+class Metadata {
+  key: MetadataKey;
+  updateAuthority: StringPublicKey;
+  mint: StringPublicKey;
+  data: Data;
+  primarySaleHappened: boolean;
+  isMutable: boolean;
+  editionNonce: number | null;
+
+  // set lazy
+  masterEdition?: StringPublicKey;
+  edition?: StringPublicKey;
+
+  constructor(args: {
+    updateAuthority: StringPublicKey;
+    mint: StringPublicKey;
+    data: Data;
+    primarySaleHappened: boolean;
+    isMutable: boolean;
+    editionNonce: number | null;
+  }) {
+    this.key = MetadataKey.MetadataV1;
+    this.updateAuthority = args.updateAuthority;
+    this.mint = args.mint;
+    this.data = args.data;
+    this.primarySaleHappened = args.primarySaleHappened;
+    this.isMutable = args.isMutable;
+    this.editionNonce = args.editionNonce;
+  }
+}
+
+const METADATA_SCHEMA = new Map<any, any>([
+  [
+    Data,
+    {
+      kind: "struct",
+      fields: [
+        ["name", "string"],
+        ["symbol", "string"],
+        ["uri", "string"],
+        ["sellerFeeBasisPoints", "u16"],
+        ["creators", { kind: "option", type: [Creator] }],
+      ],
+    },
+  ],
+  [
+    Creator,
+    {
+      kind: "struct",
+      fields: [
+        ["address", "pubkeyAsString"],
+        ["verified", "u8"],
+        ["share", "u8"],
+      ],
+    },
+  ],
+  [
+    Metadata,
+    {
+      kind: "struct",
+      fields: [
+        ["key", "u8"],
+        ["updateAuthority", "pubkeyAsString"],
+        ["mint", "pubkeyAsString"],
+        ["data", Data],
+        ["primarySaleHappened", "u8"], // bool
+        ["isMutable", "u8"], // bool
+      ],
+    },
+  ],
+]);
+
+export async function getMetadataAccount(
+  tokenMint: StringPublicKey
+): Promise<StringPublicKey> {
+  return (
+    await findProgramAddress(
+      [
+        Buffer.from(METADATA_PREFIX),
+        toPublicKey(METADATA_PROGRAM_ID).toBuffer(),
+        toPublicKey(tokenMint).toBuffer(),
+      ],
+      toPublicKey(METADATA_PROGRAM_ID)
+    )
+  )[0];
+}
+
+const METADATA_REPLACE = new RegExp("\u0000", "g");
+export const decodeMetadata = (buffer: Buffer): Metadata => {
+  const metadata = deserializeUnchecked(
+    METADATA_SCHEMA,
+    Metadata,
+    buffer
+  ) as Metadata;
+
+  metadata.data.name = metadata.data.name.replace(METADATA_REPLACE, "");
+  metadata.data.uri = metadata.data.uri.replace(METADATA_REPLACE, "");
+  metadata.data.symbol = metadata.data.symbol.replace(METADATA_REPLACE, "");
+  return metadata;
+};
