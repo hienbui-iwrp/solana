@@ -16,7 +16,6 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = {version = "^0.29.0", features = ["init-if-needed"]}
-anchor-spl = { version = "^0.29.0", features = ["metadata"] }
-mpl-token-metadata = "3.2.2"
-
+anchor-lang = { git = "https://github.com/project-serum/anchor", tag = "v0.20.1", version = "0.20.1", package = "anchor-lang"}
+anchor-spl = { git = "https://github.com/project-serum/anchor", tag = "v0.20.1", version = "0.20.1", package = "anchor-spl" }
+mpl-token-metadata = {version = "1.2.5", features = ["no-entrypoint"]}

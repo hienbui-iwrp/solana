@@ -27,9 +27,16 @@ const programID = new PublicKey(config.programId);
 describe("Solana", async () => {
   // LIST KEYPAIR
   const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
+  const RENEC_METADATA_PROGRAM_ID = new PublicKey(
+    "metaXfaoQatFJP9xiuYRsKkHYgS5NqqcfxFbLGS5LdN"
+  );
 
   //   SET PROGRAM
   const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  // const connection = new Connection(
+  //   "https://api-testnet.renec.foundation:8899",
+  //   "confirmed"
+  // );
   const deployer = new NodeWallet(
     Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY_DEPLOYER))
   );
@@ -45,9 +52,19 @@ describe("Solana", async () => {
     bs58.decode(process.env.PRIVATE_KEY_SOLANA_1)
   );
 
-  const umi = createUmi(clusterApiUrl("devnet"))
-    // .use(walletAdapterIdentity(provider.wallet))
-    .use(mplTokenMetadata());
+  const receiver = Keypair.fromSecretKey(
+    bs58.decode(process.env.PRIVATE_KEY_SOLANA_2)
+  );
+
+  const other = Keypair.fromSecretKey(
+    bs58.decode(process.env.PRIVATE_KEY_SOLANA_3)
+  );
+  // const umi = createUmi("https://api-testnet.renec.foundation:8899")
+  //   .use(walletAdapterIdentity(provider.wallet))
+  //   .use(mplTokenMetadata());
+  // const umi = createUmi(clusterApiUrl("devnet"))
+  //   .use(walletAdapterIdentity(provider.wallet))
+  //   .use(mplTokenMetadata());
 
   it("Mint NFT", async () => {
     const newMint = Keypair.generate();
@@ -58,56 +75,72 @@ describe("Solana", async () => {
       minter.publicKey
     );
     console.log("tokenAccount: ", tokenAccount.toString());
-
     const name = "Some NFT";
     const symbol = "SOME";
     const uri =
       "https://bafkreicctlwmsohditft23zxofu43ssjuxoztrlava3t6dedi7f2i6p22i.ipfs.nftstorage.link/";
     // const uri = "";
-
     // derive the metadata account
-    let metadataAccount = findMetadataPda(umi, {
-      mint: publicKey(newMint.publicKey),
-    })[0];
+    const [metadataPDA, metadataBump] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from("metadata"),
+        new PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID).toBuffer(),
+        newMint.publicKey.toBuffer(),
+      ],
+      new PublicKey(MPL_TOKEN_METADATA_PROGRAM_ID)
+    );
+    console.log("metadataPDA: ", metadataPDA, metadataBump);
+    const [metadataPDA2, metadataBump2] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from("metadata"),
+        new PublicKey(RENEC_METADATA_PROGRAM_ID).toBuffer(),
+        newMint.publicKey.toBuffer(),
+      ],
+      new PublicKey(RENEC_METADATA_PROGRAM_ID)
+    );
+    // let metadataAccount = findMetadataPda(umi, {
+    //   mint: publicKey(newMint.publicKey),
+    // })[0];
 
-    //derive the master edition pda
-    let masterEditionAccount = findMasterEditionPda(umi, {
-      mint: publicKey(newMint.publicKey),
-    })[0];
+    console.log("metadataPDA2: ", metadataPDA2, metadataBump2);
+    // //derive the master edition pda
+    // let masterEditionAccount = findMasterEditionPda(umi, {
+    //   mint: publicKey(newMint.publicKey),
+    // })[0];
+    // console.log("masterEditionAccount: ", masterEditionAccount);
     const param = {
-      name: "Some NFT",
+      name: "Some NFT123",
       symbol: "SOME",
       uri: "https://bafkreicctlwmsohditft23zxofu43ssjuxoztrlava3t6dedi7f2i6p22i.ipfs.nftstorage.link/",
-      decimals: 2,
+      decimals: 0,
+      bump: metadataBump,
     };
-
     const tx = await program.methods
       .initNft(param)
       .accounts({
         signer: minter.publicKey,
         mint: newMint.publicKey,
         associatedTokenAccount: tokenAccount,
-        metadataAccount: metadataAccount,
-        masterEditionAccount: masterEditionAccount,
+        metadataAccount: metadataPDA,
+        // masterEditionAccount: masterEditionAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SYSTEM_PROGRAM_ID,
+        // tokenMetadataProgram: RENEC_METADATA_PROGRAM_ID,
         tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        other: other.publicKey,
       })
       .signers([newMint, minter])
       .rpc();
     console.log(`https://explorer.solana.com/transaction/${tx}?cluster=devnet`);
-
-    const m = await getMetadataAccount(newMint.publicKey.toString());
-    console.log("metadata acc: ", m);
-
-    // get the account info for that account
-    const accInfo = await connection.getAccountInfo(new PublicKey(m));
-    console.log("accInfo: ", accInfo);
-
-    // finally, decode metadata
-    console.log("decode: ", decodeMetadata(accInfo!.data));
+    // const m = await getMetadataAccount(newMint.publicKey.toString());
+    // console.log("metadata acc: ", m);
+    // // get the account info for that account
+    // const accInfo = await connection.getAccountInfo(new PublicKey(m));
+    // console.log("accInfo: ", accInfo);
+    // // finally, decode metadata
+    // console.log("decode: ", decodeMetadata(accInfo!.data));
   });
 });
 
@@ -115,7 +148,7 @@ import { BinaryReader, BinaryWriter, deserializeUnchecked } from "borsh";
 import base58 from "bs58";
 
 export const METADATA_PROGRAM_ID =
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" as StringPublicKey;
+  "metaXfaoQatFJP9xiuYRsKkHYgS5NqqcfxFbLGS5LdN" as StringPublicKey;
 export const METADATA_PREFIX = "metadata";
 
 const PubKeysInternedMap = new Map<string, PublicKey>();
